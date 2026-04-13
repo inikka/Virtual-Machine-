@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>VM Simulator | Basic OS Virtualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'SF Mono', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', monospace;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0b1120 0%, #111827 100%);
+            min-height: 100vh;
+            padding: 2rem 1.5rem;
+            color: #eef2ff;
+        }
+
+        /* main container */
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* header */
+        .header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #c084fc, #60a5fa);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            color: #9ca3af;
+            margin-top: 0.5rem;
+            font-size: 1rem;
+            border-bottom: 1px dashed #2d3a5e;
+            display: inline-block;
+            padding-bottom: 0.3rem;
+        }
+
+        /* two column layout */
+        .vm-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+        }
+
+        /* create VM panel */
+        .create-panel {
+            flex: 1.2;
+            min-width: 280px;
+            background: rgba(18, 25, 45, 0.7);
+            backdrop-filter: blur(2px);
+            border-radius: 2rem;
+            border: 1px solid rgba(71, 85, 105, 0.5);
+            padding: 1.8rem;
+            box-shadow: 0 20px 35px -12px rgba(0,0,0,0.4);
+            transition: all 0.2s;
+        }
+
+        .create-panel h2 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-left: 4px solid #60a5fa;
+            padding-left: 1rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .input-group label {
+            font-weight: 500;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #cbd5e6;
+        }
+
+        .input-group input, .input-group select {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 1rem;
+            padding: 0.8rem 1rem;
+            font-size: 0.95rem;
+            color: #f1f5f9;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .input-group input:focus, .input-group select:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 2px rgba(96,165,250,0.3);
+        }
+
+        .resource-row {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .resource-row .input-group {
+            flex: 1;
+        }
+
+        button {
+            background: linear-gradient(95deg, #3b82f6, #2563eb);
+            border: none;
+            padding: 0.9rem 1.2rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            font-size: 1rem;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.2s;
+            width: 100%;
+            margin-top: 0.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background: linear-gradient(95deg, #2563eb, #1d4ed8);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px #1e3a8a80;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .reset-btn {
+            background: linear-gradient(95deg, #475569, #334155);
+            margin-top: 0.8rem;
+        }
+
+        .reset-btn:hover {
+            background: linear-gradient(95deg, #334155, #1e293b);
+        }
+
+        /* resource summary */
+        .host-stats {
+            background: #0f172a80;
+            border-radius: 1.5rem;
+            padding: 1.2rem;
+            margin-bottom: 1.8rem;
+            border: 1px solid #2d3a5e;
+        }
+
+        .host-stats h3 {
+            font-size: 1rem;
+            margin-bottom: 0.8rem;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .stat-bar {
+            background: #1e293b;
+            border-radius: 2rem;
+            height: 0.7rem;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+
+        .stat-fill {
+            background: linear-gradient(90deg, #34d399, #10b981);
+            width: 0%;
+            height: 100%;
+            border-radius: 2rem;
+            transition: width 0.3s ease;
+        }
+
+        .stat-fill.cpu-fill {
+            background: linear-gradient(90deg, #facc15, #eab308);
+        }
+
+        .stat-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .warning {
+            color: #f87171;
+            font-size: 0.75rem;
+            margin-top: 6px;
+        }
+
+        /* VM list panel */
+        .vms-panel {
+            flex: 2;
+            min-width: 340px;
+            background: rgba(18, 25, 45, 0.5);
+            border-radius: 2rem;
+            border: 1px solid rgba(71, 85, 105, 0.4);
+            padding: 1.8rem;
+            backdrop-filter: blur(2px);
+        }
+
+        .vms-panel h2 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .vm-count-badge {
+            background: #1e293b;
+            padding: 0.2rem 0.8rem;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: normal;
+        }
+
+        .vm-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-height: 560px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .vm-card {
+            background: #111827;
+            border-radius: 1.5rem;
+            padding: 1rem 1.2rem;
+            border-left: 5px solid;
+            transition: all 0.2s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .vm-info {
+            flex: 3;
+        }
+
+        .vm-name {
+            font-weight: 700;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .vm-specs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 6px;
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+
+        .vm-specs span {
+            background: #1e293b;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+        }
+
+        .vm-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .delete-btn {
+            background: #7f1a1a;
+            border: none;
+            padding: 0.4rem 0.9rem;
+            border-radius: 2rem;
+            font-weight: 500;
+            font-size: 0.75rem;
+            cursor: pointer;
+            color: white;
+            transition: 0.1s;
+            width: auto;
+            margin: 0;
+        }
+
+        .delete-btn:hover {
+            background: #b91c1c;
+            transform: scale(0.97);
+        }
+
+        .status-badge {
+            font-size: 0.7rem;
+            background: #065f46;
+            padding: 0.2rem 0.6rem;
+            border-radius: 30px;
+            color: #a7f3d0;
+        }
+
+        .empty-msg {
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+            font-style: italic;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 10px;
+        }
+
+        footer {
+            margin-top: 3rem;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #4b5563;
+        }
+
+        @media (max-width: 760px) {
+            body {
+                padding: 1rem;
+            }
+            .vm-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .vm-actions {
+                align-self: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <div class="header">
+        <h1>⚙️ Virtual Machine Simulator</h1>
+        <p>Basic OS Virtualization • Dynamic VM Creation & Resource Allocation</p>
+    </div>
+
+    <div class="vm-layout">
+        <!-- Left Panel: Create VM + Host resources -->
+        <div class="create-panel">
+            <h2>🖥️ Create New VM</h2>
+            <div class="host-stats">
+                <h3>📊 Hypervisor Resource Pool</h3>
+                <div class="stat-label">
+                    <span>💾 Total RAM: 16 GB</span>
+                    <span id="ramUsedLabel">0 GB used</span>
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-fill" id="ramFillBar" style="width: 0%"></div>
+                </div>
+                <div class="stat-label" style="margin-top: 12px;">
+                    <span>⚡ Total vCPUs: 8 cores</span>
+                    <span id="cpuUsedLabel">0 cores used</span>
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-fill cpu-fill" id="cpuFillBar" style="width: 0%"></div>
+                </div>
+                <div id="resourceWarning" class="warning"></div>
+            </div>
+
+            <div class="input-group">
+                <label>VM Name</label>
+                <input type="text" id="vmName" placeholder="e.g., Ubuntu-Server, Dev-Machine" autocomplete="off">
+            </div>
+            <div class="resource-row">
+                <div class="input-group">
+                    <label>vCPU Cores</label>
+                    <input type="number" id="vmCpu" min="1" max="8" value="1" step="1">
+                </div>
+                <div class="input-group">
+                    <label>RAM (GB)</label>
+                    <input type="number" id="vmRam" min="0.5" max="16" step="0.5" value="1">
+                </div>
+            </div>
+            <div class="input-group">
+                <label>OS Template (optional flavor)</label>
+                <select id="vmOs">
+                    <option value="Ubuntu 22.04 LTS">🐧 Ubuntu 22.04 LTS</option>
+                    <option value="Windows Server 2022">🪟 Windows Server 2022</option>
+                    <option value="Debian 12">🐧 Debian 12</option>
+                    <option value="Rocky Linux 9">🐧 Rocky Linux 9</option>
+                    <option value="FreeBSD 14">🌀 FreeBSD 14</option>
+                </select>
+            </div>
+            <button id="createVmBtn">✨ Provision Virtual Machine</button>
+            <button id="resetAllBtn" class="reset-btn">🗑️ Destroy ALL VMs & Reset</button>
+        </div>
+
+        <!-- Right Panel: VM list -->
+        <div class="vms-panel">
+            <h2>
+                📋 Virtual Machines
+                <span class="vm-count-badge" id="vmCountBadge">0 active</span>
+            </h2>
+            <div id="vmListContainer" class="vm-grid">
+                <div class="empty-msg">✨ No VMs running. Create your first VM above.</div>
+            </div>
+        </div>
+    </div>
+    <footer>⚡ Virtualization Simulator | Dynamic resource allocation & monitoring. Each VM consumes vCPUs & RAM based on real limits.</footer>
+</div>
+
+<script>
+    // --- HOST RESOURCE LIMITS ---
+    const HOST_RAM_TOTAL = 16;      // GB
+    const HOST_CPU_TOTAL = 8;       // cores
+
+    // VM store
+    let virtualMachines = [];   // each object: { id, name, cpu, ram, os }
+
+    // Helper: update all UI (resource bars, VM list, warnings)
+    function updateSystem() {
+        updateResourceUsage();
+        renderVmList();
+        updateVmCountBadge();
+        checkResourceWarnings();
+    }
+
+    // Calculate total allocated resources
+    function getAllocatedResources() {
+        let totalRam = 0;
+        let totalCpu = 0;
+        for (const vm of virtualMachines) {
+            totalRam += vm.ram;
+            totalCpu += vm.cpu;
+        }
+        return { totalRam, totalCpu };
+    }
+
+    // Update progress bars and labels
+    function updateResourceUsage() {
+        const { totalRam, totalCpu } = getAllocatedResources();
+        const ramPercent = (totalRam / HOST_RAM_TOTAL) * 100;
+        const cpuPercent = (totalCpu / HOST_CPU_TOTAL) * 100;
+
+        const ramFill = document.getElementById('ramFillBar');
+        const cpuFill = document.getElementById('cpuFillBar');
+        const ramUsedLabel = document.getElementById('ramUsedLabel');
+        const cpuUsedLabel = document.getElementById('cpuUsedLabel');
+
+        if (ramFill) ramFill.style.width = `${Math.min(ramPercent, 100)}%`;
+        if (cpuFill) cpuFill.style.width = `${Math.min(cpuPercent, 100)}%`;
+        if (ramUsedLabel) ramUsedLabel.innerText = `${totalRam.toFixed(1)} GB used`;
+        if (cpuUsedLabel) cpuUsedLabel.innerText = `${totalCpu} cores used`;
+
+        // additional color effect when near limit
+        if (ramPercent >= 95) ramFill.style.background = "#ef4444";
+        else if (ramPercent >= 80) ramFill.style.background = "#f97316";
+        else ramFill.style.background = "linear-gradient(90deg, #34d399, #10b981)";
+
+        if (cpuPercent >= 95) cpuFill.style.background = "#ef4444";
+        else if (cpuPercent >= 80) cpuFill.style.background = "#f97316";
+        else cpuFill.style.background = "linear-gradient(90deg, #facc15, #eab308)";
+    }
+
+    // Show warning if resources oversubscribed (but we prevent creation, but still handle)
+    function checkResourceWarnings() {
+        const { totalRam, totalCpu } = getAllocatedResources();
+        const warningDiv = document.getElementById('resourceWarning');
+        let warningMsg = "";
+        if (totalRam > HOST_RAM_TOTAL) {
+            warningMsg += `⚠️ Overcommitted RAM! ${totalRam.toFixed(1)}/${HOST_RAM_TOTAL} GB. `;
+        }
+        if (totalCpu > HOST_CPU_TOTAL) {
+            warningMsg += `⚠️ Overcommitted vCPUs! ${totalCpu}/${HOST_CPU_TOTAL} cores.`;
+        }
+        if (warningMsg === "") {
+            warningMsg = "✅ Resources within capacity";
+            warningDiv.style.color = "#86efac";
+        } else {
+            warningDiv.style.color = "#fca5a5";
+        }
+        warningDiv.innerText = warningMsg;
+    }
+
+    // Check if resources are available for new VM
+    function canAllocate(cpuReq, ramReq) {
+        const { totalRam, totalCpu } = getAllocatedResources();
+        const newRam = totalRam + ramReq;
+        const newCpu = totalCpu + cpuReq;
+        return (newRam <= HOST_RAM_TOTAL + 0.01) && (newCpu <= HOST_CPU_TOTAL);
+    }
+
+    // Generate unique ID
+    function generateId() {
+        return Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+    }
+
+    // Create new VM
+    function createVM(name, cpu, ram, os) {
+        // validations
+        if (!name || name.trim() === "") {
+            alert("❌ VM name cannot be empty!");
+            return false;
+        }
+        // trim whitespace but allow spaces inside
+        name = name.trim();
+        // check duplicate name? optional but nice
+        const nameExists = virtualMachines.some(vm => vm.name.toLowerCase() === name.toLowerCase());
+        if (nameExists) {
+            alert(`⚠️ VM with name "${name}" already exists. Choose unique name.`);
+            return false;
+        }
+
+        let cpuVal = Number(cpu);
+        let ramVal = Number(ram);
+        if (isNaN(cpuVal) || isNaN(ramVal) || cpuVal <= 0 || ramVal <= 0) {
+            alert("❌ CPU must be >=1 core, RAM must be >0 GB.");
+            return false;
+        }
+        cpuVal = Math.floor(cpuVal);
+        if (cpuVal > 8) {
+            alert("❌ Max vCPU per VM is 8 cores (host limit).");
+            return false;
+        }
+        if (ramVal > 16) {
+            alert("❌ Max RAM per VM is 16 GB (host limit).");
+            return false;
+        }
+        if (!canAllocate(cpuVal, ramVal)) {
+            alert(`🚫 Resource allocation failed! Not enough free resources.\nAvailable: RAM ${(HOST_RAM_TOTAL - getAllocatedResources().totalRam).toFixed(1)} GB, vCPUs ${HOST_CPU_TOTAL - getAllocatedResources().totalCpu} cores.\nRequested: ${cpuVal} vCPU, ${ramVal} GB RAM.`);
+            return false;
+        }
+
+        const newVm = {
+            id: generateId(),
+            name: name,
+            cpu: cpuVal,
+            ram: ramVal,
+            os: os,
+            createdAt: new Date().toLocaleTimeString()
+        };
+        virtualMachines.push(newVm);
+        updateSystem();
+        return true;
+    }
+
+    // Delete VM by id
+    function deleteVM(vmId) {
+        virtualMachines = virtualMachines.filter(vm => vm.id !== vmId);
+        updateSystem();
+    }
+
+    // Reset everything
+    function resetAllVMs() {
+        if (virtualMachines.length > 0 && confirm("⚠️ WARNING: This will destroy ALL virtual machines and release all resources. Proceed?")) {
+            virtualMachines = [];
+            updateSystem();
+        } else if (virtualMachines.length === 0) {
+            // nothing to reset
+            updateSystem();
+        }
+    }
+
+    // Render VM list with dynamic cards
+    function renderVmList() {
+        const container = document.getElementById('vmListContainer');
+        if (!container) return;
+
+        if (virtualMachines.length === 0) {
+            container.innerHTML = `<div class="empty-msg">💨 No active VMs. Use the panel to deploy a virtual machine.</div>`;
+            return;
+        }
+
+        // color mapping based on OS or random border style
+        const getBorderColor = (osType) => {
+            if (osType.includes("Ubuntu")) return "#3b82f6";
+            if (osType.includes("Windows")) return "#2563eb";
+            if (osType.includes("Debian")) return "#0891b2";
+            if (osType.includes("Rocky")) return "#ea580c";
+            if (osType.includes("FreeBSD")) return "#6366f1";
+            return "#8b5cf6";
+        };
+
+        const vmElements = virtualMachines.map(vm => {
+            const borderClr = getBorderColor(vm.os);
+            return `
+                <div class="vm-card" style="border-left-color: ${borderClr};">
+                    <div class="vm-info">
+                        <div class="vm-name">
+                            🖧 ${escapeHtml(vm.name)}
+                            <span class="status-badge">🟢 running</span>
+                        </div>
+                        <div class="vm-specs">
+                            <span>🧠 ${vm.cpu} vCPU cores</span>
+                            <span>💾 ${vm.ram} GB RAM</span>
+                            <span>📀 ${escapeHtml(vm.os)}</span>
+                            <span>⏱️ created: ${vm.createdAt || 'now'}</span>
+                        </div>
+                    </div>
+                    <div class="vm-actions">
+                        <button class="delete-btn" data-id="${vm.id}">🗑️ Terminate</button>
+  
